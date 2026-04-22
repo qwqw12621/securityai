@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}視覺化網路攻擊自動化分析平台{% endblock %}</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- Plotly.js（Grad-CAM 熱力圖用）-->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', '微軟正黑體', sans-serif; background:#0d1117; color:#e6edf3; }
+    .sidebar { background:#161b22; border-right:1px solid #30363d; }
+    .card { background:#161b22; border:1px solid #30363d; border-radius:8px; }
+    .btn-primary { background:#2e75b6; color:#fff; padding:8px 18px; border-radius:6px; cursor:pointer; }
+    .btn-primary:hover { background:#1f5b94; }
+    .badge-critical { background:#f85149; color:#fff; padding:2px 8px; border-radius:12px; font-size:12px; }
+    .badge-high     { background:#d29922; color:#fff; padding:2px 8px; border-radius:12px; font-size:12px; }
+    .badge-medium   { background:#388bfd; color:#fff; padding:2px 8px; border-radius:12px; font-size:12px; }
+    .badge-low      { background:#3fb950; color:#fff; padding:2px 8px; border-radius:12px; font-size:12px; }
+    .nav-link { display:block; padding:10px 16px; border-radius:6px; color:#8b949e; text-decoration:none; }
+    .nav-link:hover, .nav-link.active { background:#21262d; color:#e6edf3; }
+    .stat-card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:20px; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar w-56 flex-shrink-0 flex flex-col p-4">
+    <div class="mb-8">
+      <p class="text-blue-400 font-bold text-sm leading-tight">視覺化網路攻擊<br>自動化分析平台</p>
+      <p class="text-gray-500 text-xs mt-1">v2.3.0</p>
+    </div>
+    <nav class="flex-1 space-y-1">
+      <a href="{% url 'analyzer:dashboard' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        📊 儀表板
+      </a>
+      <a href="{% url 'analyzer:upload' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'upload' %}active{% endif %}">
+        📂 上傳 PCAP
+      </a>
+      <a href="{% url 'analyzer:sessions' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'sessions' %}active{% endif %}">
+        📋 歷史紀錄
+      </a>
+      <a href="{% url 'analyzer:live' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'live' %}active{% endif %}">
+        🔴 即時監控
+      </a>
+      <a href="{% url 'analyzer:ai_chat' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'ai_chat' %}active{% endif %}">
+        🤖 AI 助理
+      </a>
+    </nav>
+
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 overflow-auto p-6">
+    {% if messages %}
+      {% for msg in messages %}
+        <div class="mb-4 p-3 rounded-md
+          {% if msg.tags == 'error' %}bg-red-900 text-red-200
+          {% else %}bg-green-900 text-green-200{% endif %}">
+          {{ msg }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

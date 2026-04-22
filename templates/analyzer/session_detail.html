@@ -1,0 +1,157 @@
+{% extends "base/base.html" %}
+{% block title %}分析結果｜{{ session.label }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="{% url 'analyzer:sessions' %}" class="text-gray-400 hover:text-white">← 返回列表</a>
+  <h1 class="text-2xl font-bold text-white">{{ session.label }}</h1>
+  <span class="text-gray-500 text-sm">{{ session.created_at|date:"Y-m-d H:i" }}</span>
+</div>
+
+<!-- 統計摘要 -->
+<div class="grid grid-cols-4 gap-4 mb-6">
+  <div class="stat-card text-center">
+    <p class="text-gray-400 text-xs">封包總數</p>
+    <p class="text-2xl font-bold text-blue-400">{{ session.packet_count }}</p>
+  </div>
+  <div class="stat-card text-center">
+    <p class="text-gray-400 text-xs">告警數量</p>
+    <p class="text-2xl font-bold text-red-400">{{ session.alert_count }}</p>
+  </div>
+  <div class="stat-card text-center">
+    <p class="text-gray-400 text-xs">分析模式</p>
+    <p class="text-lg font-bold text-green-400">{{ session.mode }}</p>
+  </div>
+  <div class="stat-card text-center">
+    <p class="text-gray-400 text-xs">CNN 分析</p>
+    <p class="text-lg font-bold text-yellow-400">
+      {% if session.cnn_result %}完成{% else %}未執行{% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- 告警列表 -->
+<div class="card p-4 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-white font-semibold">攻擊告警（{{ alerts.count }} 筆）</h2>
+    <!-- CNN 分析按鈕 -->
+    {% if session.pcap_file and not session.cnn_result %}
+    <button onclick="runCNN({{ session.pk }})" class="btn-primary text-sm">
+      執行 CNN 分析
+    </button>
+    {% endif %}
+  </div>
+
+  {% if alerts %}
+  <div class="space-y-3">
+    {% for alert in alerts %}
+    <div class="bg-gray-800 rounded-md p-3 border-l-4
+      {% if alert.severity == 'CRITICAL' %}border-red-500
+      {% elif alert.severity == 'HIGH' %}border-yellow-500
+      {% elif alert.severity == 'MEDIUM' %}border-blue-500
+      {% else %}border-green-500{% endif %}">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="badge-{{ alert.severity|lower }} mr-2">{{ alert.severity }}</span>
+          <span class="text-white font-medium">{{ alert.attack_type }}</span>
+          <span class="text-gray-400 text-sm ml-2">來源：{{ alert.src_ip }}</span>
+        </div>
+        <span class="text-gray-500 text-xs">{{ alert.timestamp|date:"H:i:s" }}</span>
+      </div>
+      {% if alert.detail %}
+        <p class="text-gray-400 text-xs mt-2">{{ alert.detail }}</p>
+      {% endif %}
+      {% if alert.suggestion %}
+        <p class="text-blue-400 text-xs mt-1">💡 {{ alert.suggestion }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="text-gray-500 text-sm">未發現攻擊特徵</p>
+  {% endif %}
+</div>
+
+<!-- CNN 結果 -->
+{% if session.cnn_result %}
+<div class="card p-4" id="cnn-result">
+  <h2 class="text-white font-semibold mb-3">CNN Autoencoder 分析結果</h2>
+  <div class="grid grid-cols-3 gap-4">
+    <div class="text-center">
+      <p class="text-gray-400 text-xs">正常封包</p>
+      <p class="text-2xl font-bold text-green-400">{{ session.cnn_result.normal_count }}</p>
+    </div>
+    <div class="text-center">
+      <p class="text-gray-400 text-xs">異常封包</p>
+      <p class="text-2xl font-bold text-red-400">{{ session.cnn_result.anomaly_count }}</p>
+    </div>
+    <div class="text-center">
+      <p class="text-gray-400 text-xs">使用閾值</p>
+      <p class="text-xl font-bold text-yellow-400">{{ session.cnn_result.threshold|floatformat:6 }}</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- CNN 結果動態顯示區 -->
+<div id="cnn-loading" class="hidden card p-4 text-center">
+  <p class="text-gray-400">CNN 分析中，請稍候...</p>
+</div>
+<div id="cnn-dynamic-result" class="hidden card p-4"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function runCNN(sessionId) {
+  document.getElementById('cnn-loading').classList.remove('hidden');
+
+  fetch('/api/cnn/analyze/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify({ session_id: sessionId }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('cnn-loading').classList.add('hidden');
+    const div = document.getElementById('cnn-dynamic-result');
+    div.classList.remove('hidden');
+
+    if (data.error) {
+      div.innerHTML = `<p class="text-red-400">${data.error}</p>`;
+      return;
+    }
+
+    const rate = (data.detection_rate * 100).toFixed(1);
+    div.innerHTML = `
+      <h2 class="text-white font-semibold mb-3">CNN Autoencoder 分析結果</h2>
+      <div class="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <p class="text-gray-400 text-xs">正常封包</p>
+          <p class="text-2xl font-bold text-green-400">${data.normal_count}</p>
+        </div>
+        <div>
+          <p class="text-gray-400 text-xs">異常封包</p>
+          <p class="text-2xl font-bold text-red-400">${data.anomaly_count}</p>
+        </div>
+        <div>
+          <p class="text-gray-400 text-xs">異常比例</p>
+          <p class="text-2xl font-bold text-yellow-400">${rate}%</p>
+        </div>
+      </div>`;
+  })
+  .catch(err => {
+    document.getElementById('cnn-loading').classList.add('hidden');
+    alert('分析失敗：' + err.message);
+  });
+}
+
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+</script>
+{% endblock %}

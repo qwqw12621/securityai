@@ -1,0 +1,76 @@
+{% extends "base/base.html" %}
+{% block title %}上傳 PCAP｜分析平台{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">📂 上傳 PCAP 進行分析</h1>
+
+{% if error %}
+<div class="mb-4 p-3 bg-red-900 text-red-200 rounded-md">{{ error }}</div>
+{% endif %}
+
+<div class="grid grid-cols-2 gap-6">
+  <!-- 上傳表單 -->
+  <div class="card p-6">
+    <h2 class="text-white font-semibold mb-4">選擇 PCAP 檔案</h2>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <div class="mb-4">
+        <label class="text-gray-400 text-sm block mb-1">PCAP 檔案</label>
+        <input type="file" name="pcap_file" accept=".pcap,.pcapng"
+               class="w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-white text-sm"
+               required>
+        <p class="text-gray-500 text-xs mt-1">支援 .pcap / .pcapng 格式</p>
+      </div>
+
+      <div class="mb-4">
+        <label class="text-gray-400 text-sm block mb-1">標籤（選填）</label>
+        <input type="text" name="label" placeholder="例如：測試 SYN Flood"
+               class="w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-white text-sm">
+      </div>
+
+      <div class="mb-6">
+        <label class="text-gray-400 text-sm block mb-2">分析選項</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm text-gray-300">
+            <input type="checkbox" name="run_detection" checked class="accent-blue-400"> 規則式攻擊偵測
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-300">
+            <input type="checkbox" name="run_cnn" class="accent-blue-400"> CNN Autoencoder 分析
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-300">
+            <input type="checkbox" name="run_visualization" class="accent-blue-400"> 封包影像化
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary w-full text-center">
+        開始分析
+      </button>
+    </form>
+  </div>
+
+  <!-- 說明 -->
+  <div class="card p-6">
+    <h2 class="text-white font-semibold mb-4">分析功能說明</h2>
+    <div class="space-y-4 text-sm text-gray-400">
+      <div class="border-l-2 border-blue-400 pl-3">
+        <p class="text-white font-medium">規則式攻擊偵測</p>
+        <p class="mt-1">自動識別 SYN Flood、Port Scan、ICMP Flood、UDP Flood、ARP Spoofing、DNS 放大攻擊，附告警嚴重程度與防禦建議。</p>
+      </div>
+      <div class="border-l-2 border-yellow-400 pl-3">
+        <p class="text-white font-medium">CNN Autoencoder 分析</p>
+        <p class="mt-1">使用訓練好的深度學習模型計算每個封包的重建誤差，超過閾值的封包判定為異常，偵測未知攻擊類型。</p>
+      </div>
+      <div class="border-l-2 border-green-400 pl-3">
+        <p class="text-white font-medium">封包影像化</p>
+        <p class="mt-1">將封包位元組轉換為 32×32 灰階矩陣並生成熱力圖，視覺化呈現異常封包的特徵位置。</p>
+      </div>
+    </div>
+    <div class="mt-6 p-3 bg-gray-800 rounded-md">
+      <p class="text-gray-400 text-xs">測試用 PCAP 生成指令：</p>
+      <code class="text-green-400 text-xs">python core/generate_attack_pcap.py</code>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "base/base.html" %}
+{% block title %}AI 助理{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-2">🤖 AI 資安助理</h1>
+<p class="text-gray-400 text-sm mb-6">由 n8n + Gemini API 驅動，可回答資安問題、說明平台操作、解釋分析結果</p>
+
+<div class="grid grid-cols-3 gap-4" style="height:calc(100vh - 200px)">
+  <!-- 功能說明 -->
+  <div class="card p-4 flex flex-col">
+    <h2 class="text-white font-semibold mb-3">可以問我的問題</h2>
+    <div class="space-y-3 text-sm flex-1">
+      <div class="bg-gray-800 rounded-md p-3 cursor-pointer hover:bg-gray-700"
+           onclick="setPrompt('什麼是 SYN Flood 攻擊？如何防護？')">
+        <p class="text-blue-400 text-xs mb-1">資安科普</p>
+        <p class="text-gray-300">什麼是 SYN Flood 攻擊？如何防護？</p>
+      </div>
+      <div class="bg-gray-800 rounded-md p-3 cursor-pointer hover:bg-gray-700"
+           onclick="setPrompt('ARP Spoofing 會造成什麼危害？')">
+        <p class="text-blue-400 text-xs mb-1">資安科普</p>
+        <p class="text-gray-300">ARP Spoofing 會造成什麼危害？</p>
+      </div>
+      <div class="bg-gray-800 rounded-md p-3 cursor-pointer hover:bg-gray-700"
+           onclick="setPrompt('如何上傳 PCAP 檔案進行分析？')">
+        <p class="text-green-400 text-xs mb-1">操作指引</p>
+        <p class="text-gray-300">如何上傳 PCAP 檔案進行分析？</p>
+      </div>
+      <div class="bg-gray-800 rounded-md p-3 cursor-pointer hover:bg-gray-700"
+           onclick="setPrompt('Precision 和 Recall 分別代表什麼意思？')">
+        <p class="text-yellow-400 text-xs mb-1">結果說明</p>
+        <p class="text-gray-300">Precision 和 Recall 分別代表什麼？</p>
+      </div>
+      <div class="bg-gray-800 rounded-md p-3 cursor-pointer hover:bg-gray-700"
+           onclick="setPrompt('CNN Autoencoder 是如何偵測異常的？')">
+        <p class="text-purple-400 text-xs mb-1">技術說明</p>
+        <p class="text-gray-300">CNN Autoencoder 是如何偵測異常的？</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 對話區 -->
+  <div class="col-span-2 card flex flex-col">
+    <!-- 訊息列表 -->
+    <div id="msgList" class="flex-1 overflow-y-auto p-4 space-y-4">
+      <div class="flex gap-3">
+        <div class="w-8 h-8 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm">AI</div>
+        <div class="bg-gray-800 rounded-lg p-3 text-sm text-gray-300 max-w-lg">
+          你好！我是資安 AI 助理，由 n8n + Gemini API 驅動。<br>
+          我可以幫你：<br>
+          • 解釋資安概念（SYN Flood、ARP Spoofing...）<br>
+          • 說明平台操作方式<br>
+          • 解讀分析報告的數值意義<br><br>
+          請問有什麼可以幫你的？
+        </div>
+      </div>
+    </div>
+
+    <!-- 輸入區 -->
+    <div class="border-t border-gray-700 p-4">
+      <div id="n8nWarning" class="mb-3 p-2 bg-yellow-900 bg-opacity-30 rounded text-yellow-400 text-xs hidden">
+        ⚠ AI 服務暫時離線。請確認 n8n 已啟動並設定好 Webhook URL。
+      </div>
+      <div class="flex gap-3">
+        <input id="msgInput" type="text"
+               placeholder="輸入問題，按 Enter 送出..."
+               class="flex-1 bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white text-sm"
+               onkeydown="if(event.key==='Enter') sendMsg()">
+        <button onclick="sendMsg()" class="btn-primary text-sm">送出</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setPrompt(text) {
+  document.getElementById('msgInput').value = text;
+  document.getElementById('msgInput').focus();
+}
+
+function appendMsg(role, text) {
+  const list = document.getElementById('msgList');
+  const div  = document.createElement('div');
+  div.className = 'flex gap-3' + (role === 'user' ? ' justify-end' : '');
+
+  if (role === 'user') {
+    div.innerHTML = `
+      <div class="bg-blue-800 rounded-lg p-3 text-sm text-white max-w-lg">${text}</div>
+      <div class="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center text-xs">我</div>`;
+  } else {
+    div.innerHTML = `
+      <div class="w-8 h-8 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm">AI</div>
+      <div class="bg-gray-800 rounded-lg p-3 text-sm text-gray-300 max-w-lg">${text}</div>`;
+  }
+
+  list.appendChild(div);
+  list.scrollTop = list.scrollHeight;
+}
+
+function sendMsg() {
+  const input = document.getElementById('msgInput');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  appendMsg('user', msg);
+  input.value = '';
+
+  // 顯示「思考中」
+  appendMsg('ai', '⏳ 思考中...');
+
+  fetch('/api/ai/chat/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify({ message: msg }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    // 移除「思考中」
+    const msgs = document.getElementById('msgList').children;
+    msgs[msgs.length - 1].remove();
+
+    if (data.reply) {
+      appendMsg('ai', data.reply.replace(/\n/g, '<br>'));
+      document.getElementById('n8nWarning').classList.add('hidden');
+    } else {
+      appendMsg('ai', '抱歉，無法取得回應。');
+      document.getElementById('n8nWarning').classList.remove('hidden');
+    }
+  })
+  .catch(() => {
+    const msgs = document.getElementById('msgList').children;
+    msgs[msgs.length - 1].remove();
+    appendMsg('ai', '連線失敗，請確認 n8n 服務是否啟動。');
+    document.getElementById('n8nWarning').classList.remove('hidden');
+  });
+}
+
+function getCookie(name) {
+  const v = `; ${document.cookie}`, parts = v.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+</script>
+{% endblock %}

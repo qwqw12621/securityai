@@ -1,0 +1,1286 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VNAAP – Breaking Bad Cybersecurity Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:    #0f172a;
+      --bg-card:    #111827;
+      --bg-header:  #0d1117;
+      --border:     #1f2d40;
+      --border2:    #1e293b;
+      --green:      #22c55e;
+      --green-dim:  rgba(34,197,94,0.12);
+      --green-glow: rgba(34,197,94,0.25);
+      --red:        #ef4444;
+      --red-dim:    rgba(239,68,68,0.12);
+      --orange:     #f97316;
+      --orange-dim: rgba(249,115,22,0.12);
+      --yellow:     #eab308;
+      --yellow-dim: rgba(234,179,8,0.12);
+      --blue:       #3b82f6;
+      --blue-dim:   rgba(59,130,246,0.12);
+      --purple:     #a855f7;
+      --text-primary:   #e2e8f0;
+      --text-secondary: #94a3b8;
+      --text-muted:     #475569;
+      --text-faint:     #334155;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+
+    /* ══════════════════════════════════════
+       HEADER
+    ══════════════════════════════════════ */
+    header {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 24px;
+      z-index: 100;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .header-logo img {
+      height: 120px;
+      width: auto;
+      object-fit: contain;
+      object-position: left center;
+      filter: drop-shadow(0 0 18px rgba(34,197,94,0.4)) drop-shadow(0 0 6px rgba(34,197,94,0.3));
+      max-width: 620px;
+    }
+
+    /* Fallback title shown only when image fails */
+    .header-logo-fallback {
+      display: none;
+      flex-direction: column;
+    }
+    .header-logo img.errored ~ .header-logo-fallback { display: flex; }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 1.5s infinite;
+    }
+
+    .icon-btn {
+      background: #1e293b;
+      border: none;
+      border-radius: 8px;
+      padding: 8px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:hover { background: #263548; }
+    .icon-btn svg { color: var(--text-secondary); width: 18px; height: 18px; }
+    .notif-dot {
+      position: absolute; top: 4px; right: 4px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); box-shadow: 0 0 6px var(--red);
+    }
+
+    /* Notification Dropdown */
+    .notif-wrap { position: relative; }
+    .notif-dropdown {
+      display: none;
+      position: absolute; right: 0; top: calc(100% + 8px);
+      width: 290px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      z-index: 200;
+    }
+    .notif-dropdown.open { display: block; }
+    .notif-header { padding: 12px 16px; border-bottom: 1px solid #334155; font-size: 0.85rem; font-weight: 600; }
+    .notif-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid #1e293b;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .notif-item:hover { background: rgba(255,255,255,0.04); }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-dot-sm { width: 7px; height: 7px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+    .notif-msg { font-size: 0.78rem; color: #cbd5e1; }
+    .notif-time { font-size: 0.68rem; color: #64748b; margin-top: 2px; }
+
+    .profile-btn {
+      display: flex; align-items: center; gap: 8px;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 8px; padding: 6px 12px;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .profile-btn:hover { background: #263548; }
+    .avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .profile-name { font-size: 0.72rem; font-weight: 600; color: var(--text-primary); }
+    .profile-role { font-size: 0.62rem; color: var(--green); }
+
+    /* ══════════════════════════════════════
+       LAYOUT
+    ══════════════════════════════════════ */
+    .body-wrap {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ══════════════════════════════════════
+       SIDEBAR
+    ══════════════════════════════════════ */
+    aside {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--bg-header);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 0;
+      overflow-y: auto;
+    }
+
+    .nav-section { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 0 12px; }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer; transition: all 0.2s;
+      position: relative; text-decoration: none;
+      background: transparent;
+      width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.04); }
+    .nav-item.active {
+      background: linear-gradient(90deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04));
+      border-color: rgba(34,197,94,0.25);
+    }
+    .nav-item.active::before {
+      content: '';
+      position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+      width: 3px; height: 22px; border-radius: 2px;
+      background: var(--green); box-shadow: 0 0 8px var(--green);
+    }
+    .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; }
+    .nav-item.active svg { color: var(--green); filter: drop-shadow(0 0 4px var(--green)); }
+    .nav-item:not(.active) svg { color: #64748b; }
+    .nav-label { font-size: 0.8rem; }
+    .nav-item.active .nav-label { color: var(--text-primary); font-weight: 600; }
+    .nav-item:not(.active) .nav-label { color: #64748b; }
+    .nav-badge {
+      margin-left: auto; font-size: 0.62rem; padding: 2px 6px;
+      border-radius: 20px; font-weight: 600;
+      background: rgba(239,68,68,0.15); color: var(--red);
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+
+    .sidebar-divider { margin: 12px 16px; border-top: 1px solid var(--border2); }
+
+    .nav-bottom { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
+    .nav-bottom-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: 8px;
+      cursor: pointer; transition: background 0.2s;
+      background: transparent; border: none; width: 100%; text-align: left;
+    }
+    .nav-bottom-item:hover { background: rgba(255,255,255,0.04); }
+    .nav-bottom-item svg { width: 15px; height: 15px; color: #475569; }
+    .nav-bottom-item span { font-size: 0.78rem; color: #475569; }
+
+    .sidebar-version {
+      margin: 12px 12px 0;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      background: rgba(34,197,94,0.05);
+      border: 1px solid rgba(34,197,94,0.1);
+    }
+    .sidebar-version .v { font-size: 0.63rem; color: var(--green); letter-spacing: 0.1em; }
+    .sidebar-version .sub { font-size: 0.58rem; color: #475569; margin-top: 2px; }
+
+    /* ══════════════════════════════════════
+       MAIN CONTENT
+    ══════════════════════════════════════ */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Page title bar */
+    .page-bar {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .page-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); }
+    .page-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+    .page-controls { display: flex; align-items: center; gap: 12px; }
+
+    .range-picker {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 8px;
+      background: var(--bg-card); border: 1px solid var(--border2);
+    }
+    .range-label { font-size: 0.7rem; color: var(--text-muted); }
+    .range-btn {
+      padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;
+      border: 1px solid transparent; cursor: pointer;
+      background: transparent; color: #64748b; transition: all 0.15s;
+    }
+    .range-btn.active {
+      background: rgba(34,197,94,0.15); color: var(--green);
+      border-color: rgba(34,197,94,0.3);
+    }
+    .range-btn:not(.active):hover { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
+
+    .threat-badge {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border-radius: 8px;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+    }
+    .threat-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); box-shadow: 0 0 6px var(--red);
+      animation: pulse 1.5s infinite;
+    }
+    .threat-text { font-size: 0.7rem; font-weight: 600; color: var(--red); }
+
+    /* ══════════════════════════════════════
+       KPI CARDS
+    ══════════════════════════════════════ */
+    .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+    .kpi-card {
+      border-radius: 12px; padding: 20px;
+      background: var(--bg-card);
+      position: relative; overflow: hidden;
+    }
+    .kpi-glow {
+      position: absolute; top: -24px; right: -24px;
+      width: 96px; height: 96px; border-radius: 50%;
+      filter: blur(30px); opacity: 0.2;
+      pointer-events: none;
+    }
+    .kpi-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+    .kpi-title { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+    .kpi-sub { font-size: 0.62rem; color: var(--text-muted); margin-top: 2px; }
+    .kpi-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .kpi-icon svg { width: 16px; height: 16px; }
+    .kpi-value {
+      font-size: 2rem; font-weight: 700;
+      color: #f1f5f9; letter-spacing: -0.02em; line-height: 1;
+      margin-bottom: 10px; position: relative;
+    }
+    .kpi-delta {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 14px; position: relative;
+      font-size: 0.7rem;
+    }
+    .kpi-delta svg { width: 12px; height: 12px; }
+    .kpi-pills { display: flex; flex-wrap: wrap; gap: 6px; position: relative; }
+    .kpi-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 8px; border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .pill-label { font-size: 0.62rem; color: #64748b; }
+    .pill-val { font-size: 0.62rem; color: #cbd5e1; font-weight: 600; }
+
+    /* ══════════════════════════════════════
+       CHART PANEL
+    ══════════════════════════════════════ */
+    .chart-panel {
+      border-radius: 12px; padding: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      display: flex; flex-direction: column;
+    }
+    .chart-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .chart-title { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); }
+    .chart-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+    .chart-controls { display: flex; align-items: center; gap: 8px; }
+    .legend-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 8px; border-radius: 6px;
+      background: rgba(255,255,255,0.04); font-size: 0.66rem; color: var(--text-secondary);
+    }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .ctrl-btn {
+      background: transparent; border: 1px solid var(--border2);
+      border-radius: 6px; padding: 5px; cursor: pointer;
+      transition: background 0.15s; display: flex; align-items: center;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.05); }
+    .ctrl-btn svg { width: 13px; height: 13px; color: #475569; }
+    .chart-wrap { position: relative; height: 280px; }
+
+    .chart-events {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border2);
+    }
+    .event-tag {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 10px; border-radius: 6px; font-size: 0.63rem;
+    }
+    .event-tag .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .event-tag .etime { color: #94a3b8; }
+    .event-tag .etype { font-weight: 600; }
+    .chart-event-count { margin-left: auto; font-size: 0.63rem; color: var(--text-muted); }
+
+    /* ══════════════════════════════════════
+       BOTTOM ROW
+    ══════════════════════════════════════ */
+    .bottom-row {
+      display: flex; gap: 16px;
+      min-height: 420px;
+    }
+
+    /* ── Alerts Table ── */
+    .alerts-panel {
+      flex: 1; border-radius: 12px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border2);
+    }
+    .panel-title { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); }
+    .panel-sub { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+    .panel-actions { display: flex; align-items: center; gap: 8px; }
+    .filter-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 8px;
+      background: transparent; border: 1px solid var(--border2);
+      cursor: pointer; font-size: 0.72rem; color: #64748b;
+      transition: background 0.15s;
+    }
+    .filter-btn:hover { background: rgba(255,255,255,0.04); }
+    .filter-btn svg { width: 12px; height: 12px; }
+
+    .alerts-table-wrap { flex: 1; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { border-bottom: 1px solid var(--border2); }
+    th {
+      padding: 10px 16px; text-align: left;
+      font-size: 0.65rem; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+    }
+    tbody tr {
+      border-bottom: 1px solid #0f172a;
+      cursor: pointer; transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody tr.selected { background: rgba(34,197,94,0.04); }
+    tbody tr:nth-child(even) { background: rgba(255,255,255,0.01); }
+    tbody tr:nth-child(even):hover { background: rgba(255,255,255,0.03); }
+    td { padding: 10px 16px; vertical-align: middle; }
+    .td-id { font-family: var(--mono); font-size: 0.73rem; color: var(--green); }
+    .severity-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 2px 8px; border-radius: 5px;
+      font-size: 0.65rem; font-weight: 600;
+    }
+    .td-ts { font-family: var(--mono); font-size: 0.68rem; color: #64748b; }
+    .td-ip { font-family: var(--mono); font-size: 0.72rem; color: #cbd5e1; }
+    .td-type { font-size: 0.7rem; color: var(--text-secondary); }
+    .action-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 5px;
+      font-size: 0.65rem; font-weight: 600;
+    }
+    .td-actions { opacity: 0; transition: opacity 0.15s; }
+    tbody tr:hover .td-actions { opacity: 1; }
+    .row-btn {
+      background: transparent; border: none; cursor: pointer;
+      padding: 3px; border-radius: 4px; transition: background 0.15s;
+      display: inline-flex;
+    }
+    .row-btn:hover { background: rgba(255,255,255,0.08); }
+    .row-btn svg { width: 13px; height: 13px; }
+
+    .table-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 20px; border-top: 1px solid var(--border2);
+    }
+    .table-footer span { font-size: 0.68rem; color: var(--text-muted); }
+    .table-footer a { font-size: 0.7rem; color: var(--green); cursor: pointer; text-decoration: none; }
+    .table-footer a:hover { text-decoration: underline; }
+
+    /* ── Model Status ── */
+    .model-panel {
+      width: 320px; flex-shrink: 0;
+      border-radius: 12px; padding: 20px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .model-header { display: flex; align-items: center; justify-content: space-between; }
+    .training-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 10px; border-radius: 20px;
+      background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25);
+      font-size: 0.63rem; color: var(--green);
+    }
+    .training-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }
+
+    .radial-section { display: flex; align-items: center; gap: 16px; }
+    .radial-wrap {
+      position: relative; width: 90px; height: 90px; flex-shrink: 0;
+    }
+    .radial-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .radial-track { fill: none; stroke: #1e293b; stroke-width: 10; }
+    .radial-progress {
+      fill: none; stroke: var(--green); stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 220;
+      stroke-dashoffset: calc(220 - (220 * 78 / 100));
+      filter: drop-shadow(0 0 4px rgba(34,197,94,0.6));
+      transition: stroke-dashoffset 1s ease;
+    }
+    .radial-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .radial-pct { font-size: 1.1rem; font-weight: 700; color: var(--green); line-height: 1; }
+    .radial-lbl { font-size: 0.53rem; color: var(--text-muted); margin-top: 1px; }
+
+    .progress-bars { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+    .pb-row {}
+    .pb-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .pb-label { font-size: 0.63rem; color: #64748b; }
+    .pb-val { font-size: 0.63rem; color: var(--text-secondary); }
+    .pb-track { height: 6px; border-radius: 3px; background: #1e293b; overflow: hidden; }
+    .pb-fill { height: 100%; border-radius: 3px; }
+
+    .metrics-grid { display: flex; flex-direction: column; gap: 6px; }
+    .metric-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 12px; border-radius: 8px;
+      background: rgba(255,255,255,0.02); border: 1px solid var(--border2);
+    }
+    .metric-row svg { width: 13px; height: 13px; flex-shrink: 0; }
+    .metric-label { font-size: 0.68rem; color: #64748b; flex: 1; }
+    .metric-val { font-size: 0.7rem; font-weight: 600; color: #cbd5e1; font-family: var(--mono); }
+
+    .log-section {}
+    .log-title {
+      font-size: 0.64rem; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+    }
+    .log-table-wrap { border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; }
+    .log-table { width: 100%; border-collapse: collapse; }
+    .log-table th {
+      background: #0d1117; padding: 6px 8px;
+      font-size: 0.58rem; color: #475569; letter-spacing: 0.06em; font-weight: 500;
+    }
+    .log-table td { padding: 6px 8px; border-top: 1px solid #0f172a; font-size: 0.68rem; font-family: var(--mono); }
+    .log-table tr.running { background: rgba(34,197,94,0.04); }
+    .log-epoch { display: flex; align-items: center; gap: 6px; color: #94a3b8; }
+    .log-run-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }
+    .log-check svg { width: 10px; height: 10px; color: var(--green); }
+    .log-loss { color: var(--green); }
+    .log-val { color: var(--blue); }
+
+    /* ══════════════════════════════════════
+       FOOTER
+    ══════════════════════════════════════ */
+    .dash-footer {
+      background: var(--bg-card); border: 1px solid var(--border2);
+      border-radius: 10px; padding: 10px;
+      text-align: center; font-size: 0.63rem; color: var(--text-faint);
+    }
+
+    /* ══════════════════════════════════════
+       ANIMATIONS
+    ══════════════════════════════════════ */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Inline SVG icon helper */
+    svg { display: inline-block; vertical-align: middle; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     HEADER
+══════════════════════════════════════ -->
+<header>
+  <div class="header-logo">
+    <img
+      src="{% static 'img/breaking bad - Visualized Network Attack Automated Analysis Platform.png' %}"
+      alt="Breaking Bad – Visualized Network Attack Automated Analysis Platform"
+      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+    />
+    <!-- Fallback if image not found -->
+    <div class="header-logo-fallback" style="display:none; flex-direction:column;">
+      <span style="font-size:0.65rem;color:#22c55e;letter-spacing:0.1em;text-transform:uppercase;opacity:0.7;">breaking bad</span>
+      <div style="font-size:1.1rem;font-weight:700;color:#e2e8f0;line-height:1.2;">
+        <span style="color:#22c55e;">Visualized Network Attack</span>
+        <span style="opacity:0.8;"> Automated Analysis Platform</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <!-- Live indicator -->
+    <div class="live-badge">
+      <span class="live-dot"></span> LIVE
+    </div>
+
+    <!-- Notification Bell -->
+    <div class="notif-wrap">
+      <button class="icon-btn" id="notifBtn" onclick="toggleNotif()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <span class="notif-dot"></span>
+      </button>
+
+      <div class="notif-dropdown" id="notifDropdown">
+        <div class="notif-header">Notifications</div>
+        <div class="notif-item">
+          <span class="notif-dot-sm" style="background:#ef4444;box-shadow:0 0 6px #ef4444;"></span>
+          <div>
+            <div class="notif-msg">Port scan detected from 192.168.1.45</div>
+            <div class="notif-time">2m ago</div>
+          </div>
+        </div>
+        <div class="notif-item">
+          <span class="notif-dot-sm" style="background:#f97316;box-shadow:0 0 6px #f97316;"></span>
+          <div>
+            <div class="notif-msg">Anomaly threshold exceeded on eth0</div>
+            <div class="notif-time">8m ago</div>
+          </div>
+        </div>
+        <div class="notif-item">
+          <span class="notif-dot-sm" style="background:#22c55e;box-shadow:0 0 6px #22c55e;"></span>
+          <div>
+            <div class="notif-msg">Model retrain completed successfully</div>
+            <div class="notif-time">1h ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Profile -->
+    <button class="profile-btn">
+      <div class="avatar">WW</div>
+      <div>
+        <div class="profile-name">W. White</div>
+        <div class="profile-role">Analyst</div>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2" style="width:14px;height:14px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════
+     BODY
+══════════════════════════════════════ -->
+<div class="body-wrap">
+
+  <!-- SIDEBAR -->
+  <aside>
+    <div class="nav-section">
+
+      <button class="nav-item active" onclick="setTab(this,'Overview')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        <span class="nav-label">Overview</span>
+      </button>
+
+      <button class="nav-item" onclick="setTab(this,'Network Sessions')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18"/>
+        </svg>
+        <span class="nav-label">Network Sessions</span>
+      </button>
+
+      <button class="nav-item" onclick="setTab(this,'Security Alerts')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+        <span class="nav-label">Security Alerts</span>
+        <span class="nav-badge">23</span>
+      </button>
+
+      <button class="nav-item" onclick="setTab(this,'AI Model Status')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/>
+        </svg>
+        <span class="nav-label">AI Model Status</span>
+      </button>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="nav-bottom">
+      <button class="nav-bottom-item">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <span>System Health</span>
+      </button>
+      <button class="nav-bottom-item">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+        <span>Settings</span>
+      </button>
+      <button class="nav-bottom-item">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+        <span>Logout</span>
+      </button>
+    </div>
+
+    <div class="sidebar-version">
+      <div class="v">VNAAP v2.4.1</div>
+      <div class="sub">Semi-supervised AI Engine</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+
+    <!-- Page bar -->
+    <div class="page-bar">
+      <div>
+        <div class="page-title" id="pageTitle">Security Overview</div>
+        <div class="page-sub">April 6, 2026 · 19:42 UTC · Auto-refresh: 30s</div>
+      </div>
+      <div class="page-controls">
+        <div class="range-picker">
+          <span class="range-label">Range:</span>
+          <button class="range-btn" onclick="setRange(this)">1h</button>
+          <button class="range-btn" onclick="setRange(this)">6h</button>
+          <button class="range-btn active" onclick="setRange(this)">24h</button>
+          <button class="range-btn" onclick="setRange(this)">7d</button>
+        </div>
+        <div class="threat-badge">
+          <span class="threat-dot"></span>
+          <span class="threat-text">THREAT LEVEL: HIGH</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-row">
+
+      <!-- Card 1: Total Sessions -->
+      <div class="kpi-card" style="border:1px solid rgba(34,197,94,0.2);box-shadow:0 0 30px rgba(34,197,94,0.07);">
+        <div class="kpi-glow" style="background:#22c55e;"></div>
+        <div class="kpi-top">
+          <div>
+            <div class="kpi-title">Total Sessions</div>
+            <div class="kpi-sub">Last 24h</div>
+          </div>
+          <div class="kpi-icon" style="background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.2);">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#22c55e" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value">142,857</div>
+        <div class="kpi-delta" style="color:#22c55e;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          +12.4%
+        </div>
+        <div class="kpi-pills">
+          <div class="kpi-pill">
+            <span class="pill-dot" style="background:#22c55e;box-shadow:0 0 4px #22c55e;"></span>
+            <span class="pill-label">Normal</span>
+            <span class="pill-val">139,204</span>
+          </div>
+          <div class="kpi-pill">
+            <span class="pill-dot" style="background:#f97316;box-shadow:0 0 4px #f97316;"></span>
+            <span class="pill-label">Anomalous</span>
+            <span class="pill-val">3,653</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Active Alerts -->
+      <div class="kpi-card" style="border:1px solid rgba(239,68,68,0.2);box-shadow:0 0 30px rgba(239,68,68,0.07);">
+        <div class="kpi-glow" style="background:#ef4444;"></div>
+        <div class="kpi-top">
+          <div>
+            <div class="kpi-title">Active Alerts</div>
+            <div class="kpi-sub">Requiring Attention</div>
+          </div>
+          <div class="kpi-icon" style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value">23</div>
+        <div class="kpi-delta" style="color:#ef4444;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+          +5 since 1h ago
+        </div>
+        <div class="kpi-pills">
+          <div class="kpi-pill">
+            <span class="pill-dot" style="background:#ef4444;box-shadow:0 0 4px #ef4444;"></span>
+            <span class="pill-label">Critical</span><span class="pill-val">4</span>
+          </div>
+          <div class="kpi-pill">
+            <span class="pill-dot" style="background:#f97316;box-shadow:0 0 4px #f97316;"></span>
+            <span class="pill-label">High</span><span class="pill-val">9</span>
+          </div>
+          <div class="kpi-pill">
+            <span class="pill-dot" style="background:#eab308;box-shadow:0 0 4px #eab308;"></span>
+            <span class="pill-label">Medium</span><span class="pill-val">10</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Threat Threshold -->
+      <div class="kpi-card" style="border:1px solid rgba(59,130,246,0.2);box-shadow:0 0 30px rgba(59,130,246,0.07);">
+        <div class="kpi-glow" style="background:#3b82f6;"></div>
+        <div class="kpi-top">
+          <div>
+            <div class="kpi-title">Threat Threshold</div>
+            <div class="kpi-sub">Current Model Score</div>
+          </div>
+          <div class="kpi-icon" style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#3b82f6" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value">0.873</div>
+        <div class="kpi-delta" style="color:#94a3b8;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Stable
+        </div>
+        <div class="kpi-pills">
+          <div class="kpi-pill">
+            <span class="pill-dot" style="background:#22c55e;box-shadow:0 0 4px #22c55e;"></span>
+            <span class="pill-label">Confidence</span><span class="pill-val">94.2%</span>
+          </div>
+          <div class="kpi-pill">
+            <span class="pill-dot" style="background:#3b82f6;box-shadow:0 0 4px #3b82f6;"></span>
+            <span class="pill-label">Latent Dim</span><span class="pill-val">32</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Network Traffic Chart -->
+    <div class="chart-panel">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Network Traffic: Normal vs. Attack Patterns</div>
+          <div class="chart-sub">Semi-supervised anomaly detection · Real-time stream · Last 24h</div>
+        </div>
+        <div class="chart-controls">
+          <div class="legend-pill">
+            <span class="legend-dot" style="background:#22c55e;box-shadow:0 0 4px #22c55e;"></span> Normal
+          </div>
+          <div class="legend-pill">
+            <span class="legend-dot" style="background:#ef4444;box-shadow:0 0 4px #ef4444;"></span> Attack
+          </div>
+          <div class="legend-pill">
+            <span class="legend-dot" style="background:#eab308;box-shadow:0 0 4px #eab308;"></span> Threshold
+          </div>
+          <button class="ctrl-btn" onclick="refreshChart()" title="Refresh">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+            </svg>
+          </button>
+          <button class="ctrl-btn" title="Download">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="trafficChart"></canvas>
+      </div>
+
+      <div class="chart-events">
+        <div class="event-tag" style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);">
+          <span class="dot" style="background:#ef4444;"></span>
+          <span class="etime">07:00</span>
+          <span class="etype" style="color:#ef4444;">Port Scan</span>
+        </div>
+        <div class="event-tag" style="background:rgba(249,115,22,0.07);border:1px solid rgba(249,115,22,0.2);">
+          <span class="dot" style="background:#f97316;"></span>
+          <span class="etime">14:00</span>
+          <span class="etype" style="color:#f97316;">DoS Attempt</span>
+        </div>
+        <div class="event-tag" style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);">
+          <span class="dot" style="background:#ef4444;"></span>
+          <span class="etime">19:00</span>
+          <span class="etype" style="color:#ef4444;">SQL Injection</span>
+        </div>
+        <span class="chart-event-count">3 attack events detected</span>
+      </div>
+    </div>
+
+    <!-- Bottom Row -->
+    <div class="bottom-row">
+
+      <!-- Alerts Table -->
+      <div class="alerts-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Recent Alerts</div>
+            <div class="panel-sub">23 active alerts · Updated 30s ago</div>
+          </div>
+          <div class="panel-actions">
+            <button class="filter-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+              </svg>
+              Filter
+            </button>
+            <button class="filter-btn">
+              All Severities
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="alerts-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Alert ID</th><th>Severity</th><th>Timestamp</th>
+                <th>Source IP</th><th>Type</th><th>Action</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="alertsBody"></tbody>
+          </table>
+        </div>
+
+        <div class="table-footer">
+          <span>Showing 7 of 23 alerts</span>
+          <a>View all alerts →</a>
+        </div>
+      </div>
+
+      <!-- Model Status -->
+      <div class="model-panel">
+        <div class="model-header">
+          <div>
+            <div class="panel-title">Model Training Status</div>
+            <div class="panel-sub">Semi-supervised anomaly engine</div>
+          </div>
+          <div class="training-badge">
+            <span class="dot"></span> Training
+          </div>
+        </div>
+
+        <!-- Radial + Progress Bars -->
+        <div class="radial-section">
+          <div class="radial-wrap">
+            <svg class="radial-svg" viewBox="0 0 36 36">
+              <circle class="radial-track" cx="18" cy="18" r="15.9"/>
+              <circle class="radial-progress" cx="18" cy="18" r="15.9"
+                stroke-dasharray="100"
+                stroke-dashoffset="22"
+                style="stroke-dasharray:100;stroke-dashoffset:22;fill:none;stroke:#22c55e;stroke-width:2.8;stroke-linecap:round;filter:drop-shadow(0 0 3px rgba(34,197,94,0.7));transition:stroke-dashoffset 1s ease;"/>
+            </svg>
+            <div class="radial-center">
+              <span class="radial-pct">78%</span>
+              <span class="radial-lbl">complete</span>
+            </div>
+          </div>
+
+          <div class="progress-bars">
+            <div class="pb-row">
+              <div class="pb-top">
+                <span class="pb-label">Epoch Progress</span>
+                <span class="pb-val">156/200</span>
+              </div>
+              <div class="pb-track">
+                <div class="pb-fill" style="width:78%;background:linear-gradient(90deg,#22c55e,#16a34a);box-shadow:0 0 8px rgba(34,197,94,0.4);"></div>
+              </div>
+            </div>
+            <div class="pb-row">
+              <div class="pb-top">
+                <span class="pb-label">Validation Loss</span>
+                <span class="pb-val">0.0489</span>
+              </div>
+              <div class="pb-track">
+                <div class="pb-fill" style="width:35%;background:linear-gradient(90deg,#3b82f6,#2563eb);box-shadow:0 0 8px rgba(59,130,246,0.4);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-row">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#22c55e" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/></svg>
+            <span class="metric-label">Model Type</span>
+            <span class="metric-val">Semi-supervised VAE</span>
+          </div>
+          <div class="metric-row">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#3b82f6" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span class="metric-label">Latent Dim</span>
+            <span class="metric-val">32</span>
+          </div>
+          <div class="metric-row">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#f97316" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            <span class="metric-label">Current Epoch</span>
+            <span class="metric-val">156 / 200</span>
+          </div>
+          <div class="metric-row">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#eab308" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span class="metric-label">Loss (Recon.)</span>
+            <span class="metric-val">0.0412</span>
+          </div>
+          <div class="metric-row">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#a855f7" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            <span class="metric-label">Anomaly Score</span>
+            <span class="metric-val">0.873</span>
+          </div>
+        </div>
+
+        <!-- Training Log -->
+        <div class="log-section">
+          <div class="log-title">Training Log</div>
+          <div class="log-table-wrap">
+            <table class="log-table">
+              <thead><tr><th>Epoch</th><th>Loss</th><th>Val Loss</th></tr></thead>
+              <tbody>
+                <tr class="running">
+                  <td><div class="log-epoch"><span class="log-run-dot"></span>156</div></td>
+                  <td class="log-loss">0.0412</td><td class="log-val">0.0489</td>
+                </tr>
+                <tr>
+                  <td><div class="log-epoch">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" style="width:10px;height:10px;"><polyline points="20 6 9 17 4 12"/></svg>
+                    155</div></td>
+                  <td class="log-loss">0.0418</td><td class="log-val">0.0495</td>
+                </tr>
+                <tr>
+                  <td><div class="log-epoch">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" style="width:10px;height:10px;"><polyline points="20 6 9 17 4 12"/></svg>
+                    154</div></td>
+                  <td class="log-loss">0.0431</td><td class="log-val">0.0512</td>
+                </tr>
+                <tr>
+                  <td><div class="log-epoch">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" style="width:10px;height:10px;"><polyline points="20 6 9 17 4 12"/></svg>
+                    153</div></td>
+                  <td class="log-loss">0.0447</td><td class="log-val">0.0528</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="dash-footer">
+      VNAAP v2.4.1 · Semi-supervised Variational Autoencoder Engine · © 2026 Breaking Bad Security Systems
+    </div>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════ -->
+<script>
+/* ── Notification toggle ── */
+function toggleNotif() {
+  document.getElementById('notifDropdown').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.notif-wrap');
+  if (!wrap.contains(e.target)) {
+    document.getElementById('notifDropdown').classList.remove('open');
+  }
+});
+
+/* ── Sidebar tab ── */
+function setTab(el, label) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('pageTitle').textContent = label;
+}
+
+/* ── Range picker ── */
+function setRange(el) {
+  document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+/* ── Alerts Table data ── */
+const alerts = [
+  { id:'ALT-9821', sev:'Critical', sevColor:'#ef4444', sevBg:'rgba(239,68,68,0.12)',
+    ts:'2026-04-06 19:42:07', ip:'45.33.32.156', type:'SQL Injection', action:'Blocked' },
+  { id:'ALT-9820', sev:'Critical', sevColor:'#ef4444', sevBg:'rgba(239,68,68,0.12)',
+    ts:'2026-04-06 19:38:51', ip:'185.220.101.47', type:'DDoS', action:'Mitigating' },
+  { id:'ALT-9819', sev:'High',     sevColor:'#f97316', sevBg:'rgba(249,115,22,0.12)',
+    ts:'2026-04-06 19:01:23', ip:'192.168.2.88',  type:'Port Scan', action:'Monitoring' },
+  { id:'ALT-9818', sev:'High',     sevColor:'#f97316', sevBg:'rgba(249,115,22,0.12)',
+    ts:'2026-04-06 18:55:04', ip:'91.108.4.101',  type:'Brute Force', action:'Blocked' },
+  { id:'ALT-9817', sev:'Medium',   sevColor:'#eab308', sevBg:'rgba(234,179,8,0.12)',
+    ts:'2026-04-06 18:32:19', ip:'10.0.3.45',     type:'Anomaly', action:'Reviewing' },
+  { id:'ALT-9816', sev:'Medium',   sevColor:'#eab308', sevBg:'rgba(234,179,8,0.12)',
+    ts:'2026-04-06 17:58:44', ip:'172.16.0.22',   type:'Data Exfil', action:'Blocked' },
+  { id:'ALT-9815', sev:'Low',      sevColor:'#3b82f6', sevBg:'rgba(59,130,246,0.12)',
+    ts:'2026-04-06 17:15:30', ip:'10.0.1.99',     type:'Policy Violat.', action:'Logged' },
+];
+
+const actionMap = {
+  Blocked:    { color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
+  Mitigating: { color:'#f97316', bg:'rgba(249,115,22,0.1)' },
+  Monitoring: { color:'#3b82f6', bg:'rgba(59,130,246,0.1)' },
+  Reviewing:  { color:'#eab308', bg:'rgba(234,179,8,0.1)' },
+  Logged:     { color:'#94a3b8', bg:'rgba(148,163,184,0.08)' },
+};
+
+function renderAlerts() {
+  const tbody = document.getElementById('alertsBody');
+  let html = '';
+  alerts.forEach((a, i) => {
+    const ac = actionMap[a.action] || { color:'#94a3b8', bg:'transparent' };
+    html += `
+      <tr onclick="toggleRow(this)" style="border-bottom:1px solid #0f172a;background:${i%2===0?'transparent':'rgba(255,255,255,0.01)'};">
+        <td><span class="td-id">${a.id}</span></td>
+        <td>
+          <span class="severity-badge"
+            style="color:${a.sevColor};background:${a.sevBg};border:1px solid ${a.sevColor}33;">
+            ● ${a.sev}
+          </span>
+        </td>
+        <td><span class="td-ts">${a.ts}</span></td>
+        <td><span class="td-ip">${a.ip}</span></td>
+        <td><span class="td-type">${a.type}</span></td>
+        <td>
+          <span class="action-badge" style="color:${ac.color};background:${ac.bg};">${a.action}</span>
+        </td>
+        <td>
+          <div class="td-actions" style="display:flex;gap:4px;align-items:center;">
+            <button class="row-btn" title="View">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#3b82f6" stroke-width="2" style="width:13px;height:13px;"><path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button class="row-btn" title="Block IP">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+renderAlerts();
+
+function toggleRow(row) {
+  const wasSelected = row.classList.contains('selected');
+  document.querySelectorAll('#alertsBody tr').forEach(r => r.classList.remove('selected'));
+  if (!wasSelected) row.classList.add('selected');
+}
+
+/* ── Chart.js Traffic Chart ── */
+function generateData() {
+  const labels = [], normal = [], attack = [], threshold = [];
+  for (let i = 0; i < 24; i++) {
+    labels.push(`${String(i).padStart(2,'0')}:00`);
+    const base = 4500 + Math.sin(i / 3) * 1200;
+    normal.push(Math.floor(base + (Math.random() - 0.5) * 600));
+    const isSpike = i === 7 || i === 14 || i === 19;
+    attack.push(isSpike ? Math.floor(900 + Math.random() * 800) : Math.floor(50 + Math.random() * 200));
+    threshold.push(700);
+  }
+  return { labels, normal, attack, threshold };
+}
+
+let trafficChart;
+
+function buildChart() {
+  const ctx = document.getElementById('trafficChart').getContext('2d');
+  const d = generateData();
+
+  const greenGrad = ctx.createLinearGradient(0, 0, 0, 280);
+  greenGrad.addColorStop(0,   'rgba(34,197,94,0.22)');
+  greenGrad.addColorStop(1,   'rgba(34,197,94,0)');
+
+  const redGrad = ctx.createLinearGradient(0, 0, 0, 280);
+  redGrad.addColorStop(0,   'rgba(239,68,68,0.18)');
+  redGrad.addColorStop(1,   'rgba(239,68,68,0)');
+
+  if (trafficChart) trafficChart.destroy();
+
+  trafficChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [
+        {
+          label: 'Normal Traffic',
+          data: d.normal,
+          borderColor: '#22c55e',
+          borderWidth: 2,
+          backgroundColor: greenGrad,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#22c55e',
+        },
+        {
+          label: 'Attack Traffic',
+          data: d.attack,
+          borderColor: '#ef4444',
+          borderWidth: 1.5,
+          backgroundColor: redGrad,
+          fill: true,
+          tension: 0.4,
+          pointRadius: (ctx) => {
+            const i = ctx.dataIndex;
+            return (i === 7 || i === 14 || i === 19) ? 6 : 0;
+          },
+          pointBackgroundColor: '#ef4444',
+          pointBorderColor: 'rgba(239,68,68,0.3)',
+          pointBorderWidth: 4,
+          pointHoverRadius: 7,
+        },
+        {
+          label: 'Threshold',
+          data: d.threshold,
+          borderColor: '#eab308',
+          borderWidth: 1.5,
+          borderDash: [6, 3],
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: 0,
+          pointRadius: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0d1117',
+          borderColor: '#1e293b',
+          borderWidth: 1,
+          titleColor: '#94a3b8',
+          bodyColor: '#cbd5e1',
+          padding: 12,
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#1e293b', drawTicks: false },
+          ticks: { color: '#475569', font: { size: 10 }, maxTicksLimit: 9 },
+          border: { color: '#1e293b' },
+        },
+        y: {
+          grid: { color: '#1e293b', drawTicks: false },
+          ticks: {
+            color: '#475569', font: { size: 10 },
+            callback: v => `${(v/1000).toFixed(1)}k`
+          },
+          border: { color: 'transparent' },
+        }
+      }
+    }
+  });
+}
+
+buildChart();
+
+function refreshChart() { buildChart(); }
+
+/* ── Simulate live update every 30s ── */
+setInterval(() => {
+  const now = new Date();
+  document.querySelector('.page-sub').textContent =
+    `April 6, 2026 · ${now.toUTCString().slice(17,22)} UTC · Auto-refresh: 30s`;
+}, 30000);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,57 @@
+{% extends "base/base.html" %}
+{% block title %}歷史紀錄{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-white">📋 歷史分析紀錄</h1>
+  <a href="{% url 'analyzer:upload' %}" class="btn-primary text-sm">+ 新增分析</a>
+</div>
+
+<div class="card">
+  {% if sessions %}
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-gray-400 border-b border-gray-700">
+        <th class="text-left p-3">時間</th>
+        <th class="text-left p-3">標籤</th>
+        <th class="text-left p-3">模式</th>
+        <th class="text-left p-3">封包數</th>
+        <th class="text-left p-3">告警</th>
+        <th class="text-left p-3">CNN</th>
+        <th class="text-left p-3">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr class="border-b border-gray-800 hover:bg-gray-800">
+        <td class="p-3 text-gray-400">{{ s.created_at|date:"Y-m-d H:i" }}</td>
+        <td class="p-3 text-white">{{ s.label }}</td>
+        <td class="p-3">
+          <span class="{% if s.mode == 'live' %}text-green-400{% else %}text-blue-400{% endif %}">{{ s.mode }}</span>
+        </td>
+        <td class="p-3">{{ s.packet_count }}</td>
+        <td class="p-3">
+          {% if s.alert_count > 0 %}
+            <span class="badge-high">{{ s.alert_count }}</span>
+          {% else %}<span class="text-gray-500">0</span>{% endif %}
+        </td>
+        <td class="p-3">
+          {% if s.cnn_result %}<span class="text-green-400">✓</span>
+          {% else %}<span class="text-gray-600">—</span>{% endif %}
+        </td>
+        <td class="p-3">
+          <a href="{% url 'analyzer:session_detail' s.pk %}"
+             class="text-blue-400 hover:underline">查看</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div class="p-8 text-center">
+      <p class="text-gray-500">尚無分析紀錄</p>
+      <a href="{% url 'analyzer:upload' %}" class="btn-primary text-sm inline-block mt-3">上傳 PCAP</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

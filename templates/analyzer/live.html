@@ -1,0 +1,147 @@
+{% extends "base/base.html" %}
+{% block title %}即時監控{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-white">🔴 即時監控</h1>
+  <div class="flex items-center gap-3">
+    <select id="interfaceSelect"
+            class="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white text-sm">
+      <option value="">選擇網路介面...</option>
+    </select>
+    <button id="startBtn" onclick="startCapture()"
+            class="btn-primary text-sm">▶ 開始擷取</button>
+    <button id="stopBtn"  onclick="stopCapture()"
+            class="btn-primary text-sm bg-red-700 hidden">⏹ 停止</button>
+  </div>
+</div>
+
+<!-- 即時統計卡片 -->
+<div class="grid grid-cols-4 gap-4 mb-6">
+  <div class="stat-card text-center">
+    <p class="text-gray-400 text-xs">封包總數</p>
+    <p class="text-3xl font-bold text-blue-400" id="pktCount">0</p>
+  </div>
+  <div class="stat-card text-center">
+    <p class="text-gray-400 text-xs">封包/秒 (pps)</p>
+    <p class="text-3xl font-bold text-green-400" id="pps">0</p>
+  </div>
+  <div class="stat-card text-center">
+    <p class="text-gray-400 text-xs">即時告警</p>
+    <p class="text-3xl font-bold text-red-400" id="alertCount">0</p>
+  </div>
+  <div class="stat-card text-center">
+    <p class="text-gray-400 text-xs">狀態</p>
+    <p class="text-lg font-bold" id="statusText">
+      <span class="text-gray-500">待機中</span>
+    </p>
+  </div>
+</div>
+
+<!-- 圖表與告警 -->
+<div class="grid grid-cols-2 gap-4">
+  <div class="card p-4">
+    <h2 class="text-white font-semibold mb-3">協議分布</h2>
+    <canvas id="protoChart" height="200"></canvas>
+  </div>
+  <div class="card p-4">
+    <h2 class="text-white font-semibold mb-3">即時告警</h2>
+    <div id="alertFeed" class="space-y-2 overflow-y-auto max-h-48">
+      <p class="text-gray-500 text-sm" id="noAlertMsg">尚無告警</p>
+    </div>
+  </div>
+</div>
+
+<!-- 注意事項 -->
+<div class="card p-4 mt-4 border-yellow-600 bg-yellow-900 bg-opacity-20">
+  <p class="text-yellow-400 text-sm font-medium">⚠ 注意</p>
+  <p class="text-gray-300 text-sm mt-1">
+    即時封包擷取需要<strong>系統管理員權限</strong>。Windows 請以「以系統管理員身份執行」開啟命令提示符後再啟動 Django，或直接使用命令列的 live 指令。
+  </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let protoChart = null;
+let pollTimer  = null;
+
+// 初始化協議分布圖
+function initChart() {
+  protoChart = new Chart(document.getElementById('protoChart'), {
+    type: 'pie',
+    data: {
+      labels: [], datasets: [{
+        data: [],
+        backgroundColor: ['#388bfd','#3fb950','#f85149','#e3b341','#8957e5','#58a6ff'],
+        borderColor: '#161b22', borderWidth: 2,
+      }]
+    },
+    options: { plugins: { legend: { labels: { color:'#8b949e', font:{size:11} } } } }
+  });
+}
+initChart();
+
+function startCapture() {
+  const iface = document.getElementById('interfaceSelect').value;
+  fetch('/api/live/start/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+    body: JSON.stringify({ interface: iface })
+  })
+  .then(r => r.json())
+  .then(d => {
+    document.getElementById('startBtn').classList.add('hidden');
+    document.getElementById('stopBtn').classList.remove('hidden');
+    document.getElementById('statusText').innerHTML = '<span class="text-green-400">擷取中</span>';
+    pollTimer = setInterval(pollStats, 1000);
+  });
+}
+
+function stopCapture() {
+  fetch('/api/live/stop/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+    body: '{}'
+  }).then(() => {
+    clearInterval(pollTimer);
+    document.getElementById('startBtn').classList.remove('hidden');
+    document.getElementById('stopBtn').classList.add('hidden');
+    document.getElementById('statusText').innerHTML = '<span class="text-gray-500">已停止</span>';
+  });
+}
+
+function pollStats() {
+  fetch('/api/live/stats/')
+    .then(r => r.json())
+    .then(stats => {
+      document.getElementById('pktCount').textContent   = stats.packet_count || 0;
+      document.getElementById('pps').textContent        = stats.pps || 0;
+      document.getElementById('alertCount').textContent = (stats.alerts || []).length;
+
+      // 更新協議圖
+      const proto = stats.protocols || {};
+      protoChart.data.labels   = Object.keys(proto);
+      protoChart.data.datasets[0].data = Object.values(proto);
+      protoChart.update();
+
+      // 即時告警
+      const feed = document.getElementById('alertFeed');
+      if (stats.alerts && stats.alerts.length > 0) {
+        document.getElementById('noAlertMsg').style.display = 'none';
+        stats.alerts.slice(-5).forEach(a => {
+          const el = document.createElement('div');
+          el.className = 'text-xs p-2 rounded bg-red-900 bg-opacity-40 text-red-300';
+          el.textContent = `[${a.severity}] ${a.attack_type} - ${a.src_ip}`;
+          feed.prepend(el);
+        });
+      }
+    });
+}
+
+function getCookie(name) {
+  const v = `; ${document.cookie}`, parts = v.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+</script>
+{% endblock %}
